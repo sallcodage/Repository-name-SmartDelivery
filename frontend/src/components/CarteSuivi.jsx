@@ -1,4 +1,6 @@
 import { useEffect, useState } from "react";
+import { useParams } from "react-router-dom";
+
 import {
   MapContainer,
   TileLayer,
@@ -8,11 +10,6 @@ import {
 } from "react-leaflet";
 
 import "leaflet/dist/leaflet.css";
-
-// ======================================================
-// ID DE LA COMMANDE UTILISÉE POUR LE TEST GPS
-// ======================================================
-const COMMANDE_ID = "a28eaf5e-a994-40b4-b014-f5ff61bb3bca";
 
 
 // ======================================================
@@ -35,19 +32,40 @@ function RecentrerCarte({ position }) {
 // COMPOSANT PRINCIPAL
 // ======================================================
 function CarteSuivi() {
+
+  // ====================================================
+  // RECUPERER L'ID DE LA COMMANDE DEPUIS L'URL
+  // /suivi/:commandeId
+  // ====================================================
+  const { commandeId } = useParams();
+
   const [suivi, setSuivi] = useState(null);
   const [chargement, setChargement] = useState(true);
   const [erreur, setErreur] = useState("");
+
 
   // ====================================================
   // RECUPERATION DU SUIVI DEPUIS LE BACKEND
   // ====================================================
   useEffect(() => {
+
     const recupererSuivi = async () => {
       try {
         setErreur("");
 
-        // Récupération du token CLIENT
+        // ================================================
+        // VERIFIER L'ID DE LA COMMANDE
+        // ================================================
+        if (!commandeId) {
+          throw new Error(
+            "Identifiant de commande manquant."
+          );
+        }
+
+
+        // ================================================
+        // RECUPERATION DU TOKEN CLIENT
+        // ================================================
         const token = localStorage.getItem("token");
 
         if (!token) {
@@ -56,11 +74,15 @@ function CarteSuivi() {
           );
         }
 
-        // Appel de l'API de suivi
+
+        // ================================================
+        // APPEL DE L'API
+        // ================================================
         const response = await fetch(
-          `http://localhost:5000/api/commandes/${COMMANDE_ID}/suivi`,
+          `http://localhost:5000/api/commandes/${commandeId}/suivi`,
           {
             method: "GET",
+
             headers: {
               Authorization: `Bearer ${token}`,
               "Content-Type": "application/json",
@@ -68,9 +90,16 @@ function CarteSuivi() {
           }
         );
 
+
+        // ================================================
+        // CONVERSION DE LA REPONSE
+        // ================================================
         const resultat = await response.json();
 
-        // Vérification de la réponse
+
+        // ================================================
+        // VERIFICATION DE LA REPONSE
+        // ================================================
         if (!response.ok) {
           throw new Error(
             resultat.message ||
@@ -78,10 +107,14 @@ function CarteSuivi() {
           );
         }
 
-        // Enregistrer les données reçues
+
+        // ================================================
+        // ENREGISTRER LE SUIVI
+        // ================================================
         setSuivi(resultat.data);
 
       } catch (error) {
+
         console.error(
           "Erreur suivi livraison :",
           error
@@ -90,33 +123,35 @@ function CarteSuivi() {
         setErreur(error.message);
 
       } finally {
+
         setChargement(false);
+
       }
     };
 
 
-    // ====================================================
+    // ==================================================
     // PREMIER APPEL
-    // ====================================================
+    // ==================================================
     recupererSuivi();
 
 
-    // ====================================================
+    // ==================================================
     // ACTUALISATION AUTOMATIQUE TOUTES LES 10 SECONDES
-    // ====================================================
+    // ==================================================
     const intervalle = setInterval(() => {
       recupererSuivi();
     }, 10000);
 
 
-    // ====================================================
+    // ==================================================
     // NETTOYAGE DE L'INTERVALLE
-    // ====================================================
+    // ==================================================
     return () => {
       clearInterval(intervalle);
     };
 
-  }, []);
+  }, [commandeId]);
 
 
   // ====================================================
@@ -181,7 +216,7 @@ function CarteSuivi() {
 
 
   // ====================================================
-  // AUCUNE POSITION GPS
+  // POSITION GPS INDISPONIBLE
   // ====================================================
   if (!positionDisponible) {
     return (
@@ -199,6 +234,35 @@ function CarteSuivi() {
           </p>
 
         </div>
+
+
+        {suivi?.livraison && (
+          <div
+            style={{
+              marginTop: "20px",
+              lineHeight: "1.7",
+            }}
+          >
+
+            <p>
+              <strong>Statut commande :</strong>{" "}
+              {suivi?.statut_commande}
+            </p>
+
+            <p>
+              <strong>Statut livraison :</strong>{" "}
+              {suivi?.livraison?.statut}
+            </p>
+
+            <p>
+              <strong>Distance parcourue :</strong>{" "}
+              {Number(
+                suivi?.livraison?.distance || 0
+              ).toFixed(2)} km
+            </p>
+
+          </div>
+        )}
 
       </div>
     );
@@ -234,7 +298,7 @@ function CarteSuivi() {
 
 
       {/* ============================================== */}
-      {/* INFORMATIONS LIVRAISON */}
+      {/* INFORMATIONS DE LA LIVRAISON */}
       {/* ============================================== */}
 
       <div
@@ -250,40 +314,43 @@ function CarteSuivi() {
           {suivi?.livreur?.nom}
         </p>
 
+
         <p>
           <strong>Téléphone :</strong>{" "}
           {suivi?.livreur?.telephone ||
             "Non renseigné"}
         </p>
 
+
         <p>
           <strong>Départ :</strong>{" "}
           {suivi?.adresse_depart}
         </p>
+
 
         <p>
           <strong>Destination :</strong>{" "}
           {suivi?.adresse_arrivee}
         </p>
 
+
         <p>
           <strong>Statut commande :</strong>{" "}
           {suivi?.statut_commande}
         </p>
+
 
         <p>
           <strong>Statut livraison :</strong>{" "}
           {suivi?.livraison?.statut}
         </p>
 
+
         <p>
           <strong>Distance parcourue :</strong>{" "}
-          {suivi?.livraison?.distance !== undefined &&
-          suivi?.livraison?.distance !== null
-            ? `${Number(
-                suivi.livraison.distance
-              ).toFixed(2)} km`
-            : "0 km"}
+          {Number(
+            suivi?.livraison?.distance || 0
+          ).toFixed(2)} km
         </p>
 
       </div>
