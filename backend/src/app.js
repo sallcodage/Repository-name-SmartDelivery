@@ -1,7 +1,9 @@
 const express = require("express");
 const cors = require("cors");
+const path = require("path");
 
 const pool = require("./config/database");
+
 
 // ======================================================
 // IMPORT DES ROUTES
@@ -29,13 +31,38 @@ const app = express();
 app.use(
   cors({
     origin: "http://localhost:5173",
-    methods: ["GET", "POST", "PUT", "PATCH", "DELETE"],
-    allowedHeaders: ["Content-Type", "Authorization"]
+    methods: [
+      "GET",
+      "POST",
+      "PUT",
+      "PATCH",
+      "DELETE"
+    ],
+    allowedHeaders: [
+      "Content-Type",
+      "Authorization"
+    ]
   })
 );
 
+
 // Permet à Express de lire les données JSON
 app.use(express.json());
+
+
+// ======================================================
+// ACCES AUX RAPPORTS PDF
+// ======================================================
+// Permet d'ouvrir les fichiers du dossier backend/rapports
+// depuis une URL comme :
+// http://localhost:5000/rapports/nom-du-fichier.pdf
+
+app.use(
+  "/rapports",
+  express.static(
+    path.join(__dirname, "../rapports")
+  )
+);
 
 
 // ======================================================
@@ -54,9 +81,15 @@ app.get("/", (req, res) => {
 // ======================================================
 app.get("/api/test-db", async (req, res) => {
   try {
+
     const result = await pool.query(
-      "SELECT current_database() AS database, NOW() AS date_serveur"
+      `
+      SELECT
+        current_database() AS database,
+        NOW() AS date_serveur
+      `
     );
+
 
     return res.status(200).json({
       success: true,
@@ -66,13 +99,19 @@ app.get("/api/test-db", async (req, res) => {
     });
 
   } catch (error) {
-    console.error("Erreur PostgreSQL :", error.message);
+
+    console.error(
+      "Erreur PostgreSQL :",
+      error.message
+    );
+
 
     return res.status(500).json({
       success: false,
       message: "Erreur de connexion à PostgreSQL",
       error: error.message
     });
+
   }
 });
 
@@ -80,43 +119,64 @@ app.get("/api/test-db", async (req, res) => {
 // ======================================================
 // ROUTES AUTHENTIFICATION
 // ======================================================
-app.use("/api/auth", authRoutes);
+app.use(
+  "/api/auth",
+  authRoutes
+);
 
 
 // ======================================================
 // ROUTES UTILISATEURS
 // ======================================================
-app.use("/api/utilisateurs", utilisateurRoutes);
+app.use(
+  "/api/utilisateurs",
+  utilisateurRoutes
+);
 
 
 // ======================================================
 // ROUTES COMMANDES
 // ======================================================
-app.use("/api/commandes", commandeRoutes);
+app.use(
+  "/api/commandes",
+  commandeRoutes
+);
 
 
 // ======================================================
 // ROUTES LIVRAISONS
 // ======================================================
-app.use("/api/livraisons", livraisonRoutes);
+app.use(
+  "/api/livraisons",
+  livraisonRoutes
+);
 
 
 // ======================================================
 // ROUTES NOTIFICATIONS
 // ======================================================
-app.use("/api/notifications", notificationRoutes);
+app.use(
+  "/api/notifications",
+  notificationRoutes
+);
 
 
 // ======================================================
 // ROUTES KPI
 // ======================================================
-app.use("/api/kpi", kpiRoutes);
+app.use(
+  "/api/kpi",
+  kpiRoutes
+);
 
 
 // ======================================================
 // ROUTES RAPPORTS
 // ======================================================
-app.use("/api/rapports", rapportRoutes);
+app.use(
+  "/api/rapports",
+  rapportRoutes
+);
 
 
 // ======================================================

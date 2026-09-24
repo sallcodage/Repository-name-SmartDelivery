@@ -1,5 +1,9 @@
 const pool = require("../config/database");
 
+const {
+  genererRapportPDF
+} = require("../services/rapportService");
+
 
 // ======================================================
 // GENERER UN RAPPORT
@@ -7,6 +11,8 @@ const pool = require("../config/database");
 // ADMINISTRATEUR UNIQUEMENT
 // ======================================================
 const genererRapport = async (req, res) => {
+  let client;
+
   try {
     const adminId = req.user.id;
 
@@ -64,7 +70,8 @@ const genererRapport = async (req, res) => {
     ) {
       return res.status(400).json({
         success: false,
-        message: "La période indiquée contient une date invalide."
+        message:
+          "La période indiquée contient une date invalide."
       });
     }
 
@@ -105,16 +112,74 @@ const genererRapport = async (req, res) => {
       WHERE date_creation >= $1
         AND date_creation < ($2::date + INTERVAL '1 day')
       `,
-      [periode_debut, periode_fin]
+      [
+        periode_debut,
+        periode_fin
+      ]
     );
 
 
     // ==================================================
-    // 5. ENREGISTRER LE RAPPORT
+    // 5. PREPARER LES STATISTIQUES
     // ==================================================
-    // Le PDF n'est pas encore généré.
-    // fichier_url reste donc NULL pour le moment.
-    const rapportResult = await pool.query(
+    const statistiques =
+      statistiquesResult.rows[0];
+
+    const totalCommandes =
+      Number(statistiques.total_commandes || 0);
+
+    const commandesConfirmees =
+      Number(
+        statistiques.commandes_confirmees || 0
+      );
+
+    const commandesAnnulees =
+      Number(
+        statistiques.commandes_annulees || 0
+      );
+
+    const chiffreAffaires =
+      Number(
+        statistiques.chiffre_affaires || 0
+      );
+
+    const tauxReussite =
+      totalCommandes > 0
+        ? Number(
+            (
+              commandesConfirmees /
+              totalCommandes *
+              100
+            ).toFixed(2)
+          )
+        : 0;
+
+
+    const dataStatistiques = {
+      total_commandes: totalCommandes,
+      commandes_confirmees:
+        commandesConfirmees,
+      commandes_annulees:
+        commandesAnnulees,
+      chiffre_affaires:
+        chiffreAffaires,
+      taux_reussite:
+        tauxReussite
+    };
+
+
+    // ==================================================
+    // 6. OUVRIR UNE TRANSACTION
+    // ==================================================
+    client = await pool.connect();
+
+    await client.query("BEGIN");
+
+
+    // ==================================================
+    // 7. CREER LE RAPPORT EN BASE
+    // ==================================================
+    const rapportResult = await client.query(
       `
       INSERT INTO rapports (
         admin_id,
@@ -143,59 +208,130 @@ const genererRapport = async (req, res) => {
     );
 
 
-    // ==================================================
-    // 6. PREPARER LES STATISTIQUES
-    // ==================================================
-    const statistiques =
-      statistiquesResult.rows[0];
-
-    const dataStatistiques = {
-      total_commandes:
-        statistiques.total_commandes,
-
-      commandes_confirmees:
-        statistiques.commandes_confirmees,
-
-      commandes_annulees:
-        statistiques.commandes_annulees,
-
-      chiffre_affaires:
-        Number(statistiques.chiffre_affaires)
-    };
+    const rapport =
+      rapportResult.rows[0];
 
 
     // ==================================================
-    // 7. REPONSE
+    // 8. GENERER LE FICHIER PDF
+    // ==================================================
+    const pdf = await genererRapportPDF(
+      rapport,
+      dataStatistiques
+    );
+
+
+    // ==================================================
+    // 9. ENREGISTRER L'URL DU PDF
+    // ==================================================
+    const rapportMisAJourResult =
+      await client.query(
+        `
+        UPDATE rapports
+
+        SET fichier_url = $1
+
+        WHERE id = $2
+
+        RETURNING
+          id,
+          admin_id,
+          type,
+          periode_debut,
+          periode_fin,
+          fichier_url,
+          date_generation
+        `,
+        [
+          pdf.fichierUrl,
+          rapport.id
+        ]
+      );
+
+
+    // ==================================================
+    // 10. VALIDER LA TRANSACTION
+    // ==================================================
+    await client.query("COMMIT");
+
+
+    // ==================================================
+    // 11. REPONSE
     // ==================================================
     return res.status(201).json({
       success: true,
-      message: "Rapport généré avec succès.",
+
+      message:
+        "Rapport PDF généré avec succès.",
+
       data: {
-        rapport: rapportResult.rows[0],
-        statistiques: dataStatistiques
+        rapport:
+          rapportMisAJourResult.rows[0],
+
+        statistiques:
+          dataStatistiques,
+
+        fichier: {
+          nom:
+            pdf.nomFichier,
+
+          url:
+            pdf.fichierUrl
+        }
       }
     });
 
   } catch (error) {
+
+    // ==================================================
+    // ANNULER LA TRANSACTION EN CAS D'ERREUR
+    // ==================================================
+    if (client) {
+      try {
+        await client.query("ROLLBACK");
+      } catch (rollbackError) {
+        console.error(
+          "Erreur rollback rapport :",
+          rollbackError
+        );
+      }
+    }
+
+
     console.error(
       "Erreur génération rapport :",
       error
     );
 
+
     if (error.code === "22P02") {
       return res.status(400).json({
         success: false,
-        message: "Une valeur fournie est invalide."
+        message:
+          "Une valeur fournie est invalide."
       });
     }
+
 
     return res.status(500).json({
       success: false,
       message:
         "Une erreur est survenue lors de la génération du rapport."
     });
+
+  } finally {
+
+    // ==================================================
+    // LIBERER LA CONNEXION POSTGRESQL
+    // ==================================================
+    if (client) {
+      client.release();
+    }
+
   }
 };
+
+
 // ======================================================
 // LISTER TOUS LES RAPPORTS
 // GET /api/rapports
@@ -228,12 +364,19 @@ const getTousLesRapports = async (req, res) => {
       ORDER BY r.date_generation DESC
     `);
 
+
     return res.status(200).json({
       success: true,
-      message: "Rapports récupérés avec succès.",
+
+      message:
+        "Rapports récupérés avec succès.",
+
       data: {
-        nombre_rapports: result.rows.length,
-        rapports: result.rows
+        nombre_rapports:
+          result.rows.length,
+
+        rapports:
+          result.rows
       }
     });
 
@@ -244,13 +387,18 @@ const getTousLesRapports = async (req, res) => {
       error
     );
 
+
     return res.status(500).json({
       success: false,
+
       message:
         "Une erreur est survenue lors de la récupération des rapports."
     });
+
   }
 };
+
+
 // ======================================================
 // CONSULTER UN RAPPORT PAR SON ID
 // GET /api/rapports/:id
@@ -258,7 +406,9 @@ const getTousLesRapports = async (req, res) => {
 // ======================================================
 const getRapportParId = async (req, res) => {
   try {
+
     const { id } = req.params;
+
 
     const result = await pool.query(
       `
@@ -295,7 +445,8 @@ const getRapportParId = async (req, res) => {
     if (result.rows.length === 0) {
       return res.status(404).json({
         success: false,
-        message: "Rapport introuvable."
+        message:
+          "Rapport introuvable."
       });
     }
 
@@ -305,9 +456,13 @@ const getRapportParId = async (req, res) => {
     // ==================================================
     return res.status(200).json({
       success: true,
-      message: "Rapport récupéré avec succès.",
+
+      message:
+        "Rapport récupéré avec succès.",
+
       data: {
-        rapport: result.rows[0]
+        rapport:
+          result.rows[0]
       }
     });
 
@@ -325,16 +480,20 @@ const getRapportParId = async (req, res) => {
     if (error.code === "22P02") {
       return res.status(400).json({
         success: false,
-        message: "L'identifiant du rapport est invalide."
+
+        message:
+          "L'identifiant du rapport est invalide."
       });
     }
 
 
     return res.status(500).json({
       success: false,
+
       message:
         "Une erreur est survenue lors de la récupération du rapport."
     });
+
   }
 };
 

@@ -38,4 +38,4 @@ Thumbs.db
 
 # Fichiers temporaires
 *.tmp
-*.temp
+*.tempbackend/rapports/*.pdf
