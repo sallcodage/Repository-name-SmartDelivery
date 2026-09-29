@@ -8,36 +8,72 @@ const pool = require("./config/database");
 // ======================================================
 // IMPORT DES ROUTES
 // ======================================================
+
 const authRoutes = require("./routes/authRoutes");
-const utilisateurRoutes = require("./routes/utilisateurRoutes");
-const commandeRoutes = require("./routes/commandeRoutes");
-const livraisonRoutes = require("./routes/livraisonRoutes");
-const notificationRoutes = require("./routes/notificationRoutes");
-const kpiRoutes = require("./routes/kpiRoutes");
-const rapportRoutes = require("./routes/rapportRoutes");
+const utilisateurRoutes =
+  require("./routes/utilisateurRoutes");
+const commandeRoutes =
+  require("./routes/commandeRoutes");
+const livraisonRoutes =
+  require("./routes/livraisonRoutes");
+const notificationRoutes =
+  require("./routes/notificationRoutes");
+const kpiRoutes =
+  require("./routes/kpiRoutes");
+const rapportRoutes =
+  require("./routes/rapportRoutes");
+const assistantIARoutes =
+  require("./routes/assistantIARoutes");
 
 
 // ======================================================
 // CREATION DE L'APPLICATION EXPRESS
 // ======================================================
+
 const app = express();
 
 
 // ======================================================
-// MIDDLEWARES
+// CONFIGURATION CORS
 // ======================================================
 
-// Autoriser le frontend React à communiquer avec le backend
+// Ports utilisés par Vite en développement
+const originesAutorisees = [
+  "http://localhost:5173",
+  "http://localhost:5174"
+];
+
 app.use(
   cors({
-    origin: "http://localhost:5173",
+    origin: function (origin, callback) {
+
+      // Autorise les requêtes sans origine
+      // comme Postman ou curl
+      if (!origin) {
+        return callback(null, true);
+      }
+
+      // Vérifie si le frontend est autorisé
+      if (originesAutorisees.includes(origin)) {
+        return callback(null, true);
+      }
+
+      return callback(
+        new Error(
+          `Origine CORS non autorisée : ${origin}`
+        )
+      );
+    },
+
     methods: [
       "GET",
       "POST",
       "PUT",
       "PATCH",
-      "DELETE"
+      "DELETE",
+      "OPTIONS"
     ],
+
     allowedHeaders: [
       "Content-Type",
       "Authorization"
@@ -46,16 +82,16 @@ app.use(
 );
 
 
-// Permet à Express de lire les données JSON
+// ======================================================
+// JSON
+// ======================================================
+
 app.use(express.json());
 
 
 // ======================================================
 // ACCES AUX RAPPORTS PDF
 // ======================================================
-// Permet d'ouvrir les fichiers du dossier backend/rapports
-// depuis une URL comme :
-// http://localhost:5000/rapports/nom-du-fichier.pdf
 
 app.use(
   "/rapports",
@@ -68,8 +104,9 @@ app.use(
 // ======================================================
 // ROUTE PRINCIPALE
 // ======================================================
+
 app.get("/", (req, res) => {
-  res.status(200).json({
+  return res.status(200).json({
     message: "SmartDelivery Sénégal API",
     status: "OK"
   });
@@ -79,7 +116,9 @@ app.get("/", (req, res) => {
 // ======================================================
 // TEST CONNEXION POSTGRESQL
 // ======================================================
+
 app.get("/api/test-db", async (req, res) => {
+
   try {
 
     const result = await pool.query(
@@ -89,7 +128,6 @@ app.get("/api/test-db", async (req, res) => {
         NOW() AS date_serveur
       `
     );
-
 
     return res.status(200).json({
       success: true,
@@ -105,10 +143,10 @@ app.get("/api/test-db", async (req, res) => {
       error.message
     );
 
-
     return res.status(500).json({
       success: false,
-      message: "Erreur de connexion à PostgreSQL",
+      message:
+        "Erreur de connexion à PostgreSQL",
       error: error.message
     });
 
@@ -119,6 +157,7 @@ app.get("/api/test-db", async (req, res) => {
 // ======================================================
 // ROUTES AUTHENTIFICATION
 // ======================================================
+
 app.use(
   "/api/auth",
   authRoutes
@@ -128,6 +167,7 @@ app.use(
 // ======================================================
 // ROUTES UTILISATEURS
 // ======================================================
+
 app.use(
   "/api/utilisateurs",
   utilisateurRoutes
@@ -137,6 +177,7 @@ app.use(
 // ======================================================
 // ROUTES COMMANDES
 // ======================================================
+
 app.use(
   "/api/commandes",
   commandeRoutes
@@ -146,6 +187,7 @@ app.use(
 // ======================================================
 // ROUTES LIVRAISONS
 // ======================================================
+
 app.use(
   "/api/livraisons",
   livraisonRoutes
@@ -155,6 +197,7 @@ app.use(
 // ======================================================
 // ROUTES NOTIFICATIONS
 // ======================================================
+
 app.use(
   "/api/notifications",
   notificationRoutes
@@ -164,6 +207,7 @@ app.use(
 // ======================================================
 // ROUTES KPI
 // ======================================================
+
 app.use(
   "/api/kpi",
   kpiRoutes
@@ -173,6 +217,7 @@ app.use(
 // ======================================================
 // ROUTES RAPPORTS
 // ======================================================
+
 app.use(
   "/api/rapports",
   rapportRoutes
@@ -180,6 +225,51 @@ app.use(
 
 
 // ======================================================
-// EXPORT DE L'APPLICATION
+// ROUTES ASSISTANT IA
 // ======================================================
+
+app.use(
+  "/api/assistant-ia",
+  assistantIARoutes
+);
+
+
+// ======================================================
+// ROUTE INTROUVABLE
+// ======================================================
+
+app.use((req, res) => {
+
+  return res.status(404).json({
+    success: false,
+    message: "Route API introuvable."
+  });
+
+});
+
+
+// ======================================================
+// GESTION DES ERREURS
+// ======================================================
+
+app.use((error, req, res, next) => {
+
+  console.error(
+    "Erreur serveur :",
+    error.message
+  );
+
+  return res.status(500).json({
+    success: false,
+    message:
+      "Une erreur interne est survenue."
+  });
+
+});
+
+
+// ======================================================
+// EXPORT
+// ======================================================
+
 module.exports = app;

@@ -1,111 +1,160 @@
-import { Routes, Route, Link } from "react-router-dom";
+import {
+  Routes,
+  Route,
+  Navigate
+} from "react-router-dom";
 
-import CarteSuivi from "./components/CarteSuivi";
+// ==========================================
+// PAGES
+// ==========================================
+
+import Login from "./pages/Login";
+import ClientDashboard from "./pages/ClientDashboard";
+import NouvelleCommande from "./pages/NouvelleCommande";
+
+// ==========================================
+// COMPOSANTS
+// ==========================================
+
 import MesCommandes from "./components/MesCommandes";
+import CarteSuivi from "./components/CarteSuivi";
+
+// ==========================================
+// STYLE
+// ==========================================
 
 import "./App.css";
 
 
+// ==========================================
+// APPLICATION
+// ==========================================
+
 function App() {
   return (
-    <main className="app">
+    <Routes>
 
-      {/* ============================================== */}
-      {/* EN-TETE */}
-      {/* ============================================== */}
+      {/* ====================================== */}
+      {/* CONNEXION */}
+      {/* ====================================== */}
 
-      <header className="header">
-
-        <h1>
-          SmartDelivery Sénégal
-        </h1>
-
-        <p>
-          Suivi intelligent de vos livraisons
-        </p>
+      <Route
+        path="/"
+        element={<Login />}
+      />
 
 
-        {/* ============================================ */}
-        {/* NAVIGATION */}
-        {/* ============================================ */}
+      {/* ====================================== */}
+      {/* ESPACE CLIENT */}
+      {/* ====================================== */}
 
-        <nav
-          style={{
-            marginTop: "20px",
-            display: "flex",
-            gap: "20px",
-          }}
-        >
-
-          <Link to="/">
-            Accueil
-          </Link>
-
-          <Link to="/mes-commandes">
-            Mes commandes
-          </Link>
-
-        </nav>
-
-      </header>
+      <Route
+        path="/client"
+        element={<ClientDashboard />}
+      />
 
 
-      {/* ============================================== */}
-      {/* CONTENU */}
-      {/* ============================================== */}
+      {/* ====================================== */}
+      {/* NOUVELLE COMMANDE */}
+      {/* ====================================== */}
 
-      <section className="contenu">
+      <Route
+        path="/nouvelle-commande"
+        element={<NouvelleCommande />}
+      />
 
-        <Routes>
 
-          {/* ========================================== */}
-          {/* PAGE D'ACCUEIL */}
-          {/* ========================================== */}
+      {/* ====================================== */}
+      {/* MES COMMANDES */}
+      {/* ====================================== */}
 
-          <Route
-            path="/"
-            element={
-              <div>
+      <Route
+        path="/mes-commandes"
+        element={<MesCommandes />}
+      />
 
-                <h2>
-                  Bienvenue sur SmartDelivery Sénégal
-                </h2>
 
-                <p>
-                  Gérez et suivez vos livraisons
-                  simplement.
-                </p>
+      {/* ====================================== */}
+      {/* SUIVI GPS */}
+      {/* ====================================== */}
 
-              </div>
-            }
+      <Route
+        path="/suivi/:commandeId"
+        element={<CarteSuivi />}
+      />
+
+
+      {/* ====================================== */}
+      {/* ESPACE LIVREUR */}
+      {/* TEMPORAIRE */}
+      {/* ====================================== */}
+
+      <Route
+        path="/livreur"
+        element={
+          <div
+            style={{
+              padding: "40px"
+            }}
+          >
+            <h1>
+              Espace Livreur
+            </h1>
+
+            <p>
+              Gestion de vos livraisons.
+            </p>
+          </div>
+        }
+      />
+
+
+      {/* ====================================== */}
+      {/* ESPACE ADMINISTRATEUR */}
+      {/* TEMPORAIRE */}
+      {/* ====================================== */}
+
+      <Route
+        path="/admin"
+        element={
+          <div
+            style={{
+              padding: "40px"
+            }}
+          >
+            <h1>
+              Tableau de bord Administrateur
+            </h1>
+
+            <p>
+              Administration de SmartDelivery Sénégal.
+            </p>
+          </div>
+        }
+      />
+
+
+      {/* ====================================== */}
+      {/* ROUTE INCONNUE */}
+      {/* ====================================== */}
+
+      <Route
+        path="*"
+        element={
+          <Navigate
+            to="/"
+            replace
           />
+        }
+      />
 
-
-          {/* ========================================== */}
-          {/* COMMANDES DU CLIENT */}
-          {/* ========================================== */}
-
-          <Route
-            path="/mes-commandes"
-            element={<MesCommandes />}
-          />
-
-
-          {/* ========================================== */}
-          {/* SUIVI D'UNE COMMANDE */}
-          {/* ========================================== */}
-
-          <Route
-            path="/suivi/:commandeId"
-            element={<CarteSuivi />}
-          />
-
-        </Routes>
-
-      </section>
-
-    </main>
+    </Routes>
   );
 }
+
+
+// ==========================================
+// EXPORT
+// ==========================================
 
 export default App;
